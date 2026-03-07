@@ -53,8 +53,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SonAIengine/devhub"
-Repository = "https://github.com/SonAIengine/devhub"
+Homepage = "https://github.com/SonAIengine/devhub-social"
+Repository = "https://github.com/SonAIengine/devhub-social"
 Issues = "https://github.com/SonAIengine/devhub/issues"
 
 [tool.hatch.build.targets.wheel]

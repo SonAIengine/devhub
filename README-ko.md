@@ -330,7 +330,7 @@ devhub/
 ## 개발
 
 ```bash
-git clone https://github.com/SonAIengine/devhub.git
+git clone https://github.com/SonAIengine/devhub-social.git
 cd devhub
 pip install -e ".[all,dev]"
 
