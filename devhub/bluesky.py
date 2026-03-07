@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime
 from typing import Any
 
@@ -128,8 +129,10 @@ class Bluesky(PlatformAdapter):
         **kwargs: object,
     ) -> PostResult:
         text = f"{title}\n\n{body}" if title else body
+        text = text[:300]
+        facets = self._extract_url_facets(text)
         try:
-            result = await self.client.send_post(text=text[:300])
+            result = await self.client.send_post(text=text, facets=facets or None)
             return PostResult(
                 success=True,
                 platform=self.platform,
@@ -232,6 +235,25 @@ class Bluesky(PlatformAdapter):
             )
             if hasattr(reply, "replies") and reply.replies:
                 self._flatten_thread(reply.replies, post_id, out, reply.post.uri)
+
+    @staticmethod
+    def _extract_url_facets(text: str) -> list[Any]:
+        """텍스트에서 URL을 찾아 Bluesky facet (클릭 가능 링크)으로 변환."""
+        facets = []
+        url_pattern = re.compile(r"https?://[^\s]+|(?<!\w)[\w.-]+\.(?:com|org|net|io|dev|app|xyz|me|co)(?:/[^\s]*)?")
+        text_bytes = text.encode("utf-8")
+        for match in url_pattern.finditer(text):
+            url = match.group()
+            uri = url if url.startswith("http") else f"https://{url}"
+            start = len(text[:match.start()].encode("utf-8"))
+            end = len(text[:match.end()].encode("utf-8"))
+            facets.append(
+                models.AppBskyRichtextFacet.Main(
+                    index=models.AppBskyRichtextFacet.ByteSlice(byte_start=start, byte_end=end),
+                    features=[models.AppBskyRichtextFacet.Link(uri=uri)],
+                )
+            )
+        return facets
 
     @staticmethod
     def _uri_to_url(uri: str) -> str:
