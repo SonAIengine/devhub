@@ -417,7 +417,7 @@ async def test_twikit_tweet_to_post_fields():
 
     assert post.id == "777"
     assert post.platform == "twitter"
-    assert post.title == ""
+    assert post.title == "Test tweet"
     assert post.body == "Test tweet"
     assert post.author == "testuser"
     assert post.likes == 42

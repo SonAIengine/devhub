@@ -323,12 +323,13 @@ class Twitter(PlatformAdapter):
         )
 
     def _twikit_tweet_to_post(self, tweet: Any) -> Post:
+        text = tweet.text or ""
         return Post(
             id=str(tweet.id),
             platform=self.platform,
-            title="",
+            title=text[:80] if text else "",
             url=f"https://x.com/i/status/{tweet.id}",
-            body=tweet.text or "",
+            body=text,
             author=tweet.user.screen_name if tweet.user else "",
             likes=tweet.favorite_count or 0,
             comments_count=tweet.reply_count or 0,
@@ -352,7 +353,7 @@ class Twitter(PlatformAdapter):
     async def _tweepy_search(self, query: str, *, limit: int = 20) -> list[Post]:
         assert self._tweepy is not None
         resp = await self._tweepy.search_recent_tweets(
-            query=f"{query} -is:retweet",
+            query=f"{query} lang:en -is:retweet",
             max_results=min(max(limit, 10), 100),
             tweet_fields=_TWEET_FIELDS,
             expansions=["author_id"],
@@ -429,12 +430,13 @@ class Twitter(PlatformAdapter):
         author = ""
         if tweet.author_id and tweet.author_id in users:
             author = users[tweet.author_id].username
+        text = tweet.text or ""
         return Post(
             id=str(tweet.id),
             platform=self.platform,
-            title="",
+            title=text[:80] if text else "",
             url=f"https://x.com/i/status/{tweet.id}",
-            body=tweet.text,
+            body=text,
             author=author,
             likes=metrics.get("like_count", 0),
             comments_count=metrics.get("reply_count", 0),
