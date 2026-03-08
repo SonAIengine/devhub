@@ -143,6 +143,25 @@ class Twitter(PlatformAdapter):
         bearer_ok = bool(os.getenv("TWITTER_BEARER_TOKEN"))
         return twikit_ok or tweepy_ok or bearer_ok
 
+    @classmethod
+    def setup_guide(cls) -> dict[str, Any]:
+        return {
+            "url": "https://developer.x.com/en/portal/dashboard",
+            "steps": [
+                "1. https://developer.x.com/en/portal/dashboard 접속",
+                "2. 프로젝트/앱 생성 (Free tier 가능)",
+                "3. 'Keys and Tokens' 탭에서 API Key, API Secret 복사",
+                "4. 'Authentication Tokens'에서 Access Token, Access Secret 생성 후 복사",
+            ],
+            "required_keys": [
+                "TWITTER_API_KEY",
+                "TWITTER_API_SECRET",
+                "TWITTER_ACCESS_TOKEN",
+                "TWITTER_ACCESS_SECRET",
+            ],
+            "allowed_actions": ["comment", "post"],
+        }
+
     # -- read (twikit first, tweepy fallback) --
 
     async def get_trending(self, *, limit: int = 20) -> list[Post]:

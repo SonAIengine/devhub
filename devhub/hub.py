@@ -28,16 +28,9 @@ class Hub:
     @classmethod
     def from_env(cls) -> Hub:
         """Build a Hub with every adapter whose env vars are present."""
-        from devhub.bluesky import Bluesky
-        from devhub.devto import DevTo
-        from devhub.reddit import Reddit
-        from devhub.twitter import Twitter
+        from devhub.registry import get_configured_adapters
 
-        adapters: list[PlatformAdapter] = []
-        for adapter_cls in (DevTo, Bluesky, Twitter, Reddit):
-            if adapter_cls.is_configured():
-                adapters.append(adapter_cls())
-        return cls(adapters)
+        return cls(get_configured_adapters())
 
     # -- lifecycle --
 

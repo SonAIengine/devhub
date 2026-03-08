@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from typing_extensions import Self
 
@@ -19,6 +20,28 @@ class PlatformAdapter(ABC):
     """
 
     platform: str = "unknown"
+
+    # -- plugin metadata --
+
+    @classmethod
+    def setup_guide(cls) -> dict[str, Any]:
+        """Return onboarding guide for this platform.
+
+        Subclasses should override to provide platform-specific setup info::
+
+            {
+                "url": "https://...",
+                "steps": ["1. ...", "2. ..."],
+                "required_keys": ["API_KEY"],
+                "allowed_actions": ["comment", "post"],
+            }
+        """
+        return {
+            "url": "",
+            "steps": [],
+            "required_keys": [],
+            "allowed_actions": ["comment"],
+        }
 
     # -- lifecycle --
 

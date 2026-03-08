@@ -55,6 +55,20 @@ class Bluesky(PlatformAdapter):
     def is_configured(cls) -> bool:
         return bool(os.getenv("BLUESKY_HANDLE") and os.getenv("BLUESKY_APP_PASSWORD"))
 
+    @classmethod
+    def setup_guide(cls) -> dict[str, Any]:
+        return {
+            "url": "https://bsky.app/settings",
+            "steps": [
+                "1. https://bsky.app/settings 접속",
+                "2. 'App Passwords' 클릭",
+                "3. 앱 이름 입력 (예: gwanjong) 후 생성",
+                "4. handle (예: user.bsky.social)과 생성된 앱 비밀번호 복사",
+            ],
+            "required_keys": ["BLUESKY_HANDLE", "BLUESKY_APP_PASSWORD"],
+            "allowed_actions": ["comment", "post"],
+        }
+
     # -- read --
 
     async def get_trending(self, *, limit: int = 20) -> list[Post]:
@@ -201,7 +215,7 @@ class Bluesky(PlatformAdapter):
             id=pv.uri,
             platform=self.platform,
             title="",
-            url=self._uri_to_url(pv.uri),
+            url=self._uri_to_url(pv.uri, handle=pv.author.handle if pv.author else ""),
             body=text,
             author=pv.author.handle if pv.author else "",
             likes=pv.like_count or 0,
@@ -255,11 +269,12 @@ class Bluesky(PlatformAdapter):
             )
         return facets
 
-    @staticmethod
-    def _uri_to_url(uri: str) -> str:
+    def _uri_to_url(self, uri: str, handle: str = "") -> str:
         # at://did:plc:xxx/app.bsky.feed.post/rkey → bsky.app URL
+        # handle 기반 URL 사용 (DID URL은 bsky.app에서 Not Found)
         parts = uri.replace("at://", "").split("/")
         if len(parts) >= 3:
-            did, _, rkey = parts[0], parts[1], parts[2]
-            return f"https://bsky.app/profile/{did}/post/{rkey}"
+            _, _, rkey = parts[0], parts[1], parts[2]
+            actor = handle or self.handle or parts[0]
+            return f"https://bsky.app/profile/{actor}/post/{rkey}"
         return ""

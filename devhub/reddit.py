@@ -65,6 +65,27 @@ class Reddit(PlatformAdapter):
     def is_configured(cls) -> bool:
         return bool(os.getenv("REDDIT_CLIENT_ID") and os.getenv("REDDIT_CLIENT_SECRET"))
 
+    @classmethod
+    def setup_guide(cls) -> dict[str, Any]:
+        return {
+            "url": "https://www.reddit.com/prefs/apps",
+            "steps": [
+                "1. https://www.reddit.com/prefs/apps 접속",
+                "2. 'create another app' 클릭",
+                "3. name: gwanjong, type: script 선택",
+                "4. redirect uri: http://localhost:8080 입력",
+                "5. 생성 후 client_id (앱 이름 아래 문자열)와 secret 복사",
+                "6. Reddit 계정의 username, password도 필요",
+            ],
+            "required_keys": [
+                "REDDIT_CLIENT_ID",
+                "REDDIT_CLIENT_SECRET",
+                "REDDIT_USERNAME",
+                "REDDIT_PASSWORD",
+            ],
+            "allowed_actions": ["comment", "upvote"],
+        }
+
     # -- read --
 
     async def get_trending(self, *, limit: int = 20) -> list[Post]:

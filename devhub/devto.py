@@ -48,6 +48,20 @@ class DevTo(PlatformAdapter):
     def is_configured(cls) -> bool:
         return bool(os.getenv("DEVTO_API_KEY"))
 
+    @classmethod
+    def setup_guide(cls) -> dict[str, Any]:
+        return {
+            "url": "https://dev.to/settings/extensions",
+            "steps": [
+                "1. https://dev.to/settings/extensions 접속",
+                "2. 'DEV API Keys' 섹션에서 description 입력",
+                "3. 'Generate API Key' 클릭",
+                "4. 생성된 API Key 복사",
+            ],
+            "required_keys": ["DEVTO_API_KEY"],
+            "allowed_actions": ["comment", "post"],
+        }
+
     # -- read --
 
     async def get_trending(self, *, limit: int = 20) -> list[Post]:
