@@ -268,7 +268,21 @@ class Twitter(PlatformAdapter):
             tweet_id = ""
             if tweet:
                 tweet_id = str(tweet.get("id", "") if isinstance(tweet, dict) else getattr(tweet, "id", ""))
-            url = f"https://x.com/i/status/{tweet_id}" if tweet_id else ""
+
+            if not tweet_id:
+                return PostResult(success=False, platform=self.platform, error="No tweet_id in response")
+
+            # reply가 실제로 됐는지 검증 — 독립 트윗이면 삭제
+            try:
+                verify = await self._tweepy.get_tweet(tweet_id, tweet_fields=["in_reply_to_user_id"])
+                if verify.data and not verify.data.in_reply_to_user_id:
+                    logger.warning("Twitter write_comment: reply가 독립 트윗으로 발행됨 — 삭제: %s", tweet_id)
+                    await self._tweepy.delete_tweet(tweet_id)
+                    return PostResult(success=False, platform=self.platform, error="Reply posted as standalone tweet — deleted")
+            except Exception:
+                pass  # 검증 실패는 무시
+
+            url = f"https://x.com/i/status/{tweet_id}"
             logger.info("Twitter write_comment: tweet_id=%s url=%s", tweet_id, url)
             return PostResult(
                 success=True,
