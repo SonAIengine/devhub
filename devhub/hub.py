@@ -22,6 +22,7 @@ class Hub:
 
     def __init__(self, adapters: list[PlatformAdapter] | None = None) -> None:
         self.adapters: list[PlatformAdapter] = adapters or []
+        self.last_errors: dict[str, dict[str, str | dict[str, str]]] = {}
 
     # -- factory --
 
@@ -45,19 +46,25 @@ class Hub:
 
     async def get_trending(self, *, limit: int = 20) -> list[Post]:
         """Fetch trending posts from all active platforms."""
+        targets = list(self.adapters)
         results = await asyncio.gather(
-            *(a.get_trending(limit=limit) for a in self.adapters),
+            *(a.get_trending(limit=limit) for a in targets),
             return_exceptions=True,
         )
-        return self._merge_posts(results)
+        posts, errors = self._collect_posts(targets, results, operation="get_trending")
+        self.last_errors["get_trending"] = errors
+        return posts
 
     async def search(self, query: str, *, limit: int = 20) -> list[Post]:
         """Search across all active platforms in parallel."""
+        targets = list(self.adapters)
         results = await asyncio.gather(
-            *(a.search(query, limit=limit) for a in self.adapters),
+            *(a.search(query, limit=limit) for a in targets),
             return_exceptions=True,
         )
-        return self._merge_posts(results)
+        posts, errors = self._collect_posts(targets, results, operation="search")
+        self.last_errors["search"] = errors
+        return posts
 
     # -- write (fan-out) --
 
@@ -79,12 +86,15 @@ class Hub:
             *(a.write_post(title, body, tags=tags) for a in targets),
             return_exceptions=True,
         )
+        errors: dict[str, str] = {}
         out: list[PostResult] = []
-        for r in results:
+        for adapter, r in zip(targets, results):
             if isinstance(r, PostResult):
                 out.append(r)
             elif isinstance(r, BaseException):
-                out.append(PostResult(success=False, platform="unknown", error=str(r)))
+                errors[adapter.platform] = str(r)
+                out.append(PostResult(success=False, platform=adapter.platform, error=str(r)))
+        self.last_errors["publish"] = errors
         return out
 
     # -- helpers --
@@ -99,10 +109,22 @@ class Hub:
         return [a for a in self.adapters if a.platform in names]
 
     @staticmethod
-    def _merge_posts(results: list[list[Post] | BaseException]) -> list[Post]:
+    def _collect_posts(
+        adapters: list[PlatformAdapter],
+        results: list[list[Post] | BaseException],
+        operation: str,
+    ) -> tuple[list[Post], dict[str, str | dict[str, str]]]:
         merged: list[Post] = []
-        for r in results:
+        errors: dict[str, str | dict[str, str]] = {}
+        for adapter, r in zip(adapters, results):
             if isinstance(r, list):
                 merged.extend(r)
+                adapter_errors = getattr(adapter, "last_errors", {})
+                if isinstance(adapter_errors, dict):
+                    operation_errors = adapter_errors.get(operation, {})
+                    if operation_errors:
+                        errors[adapter.platform] = operation_errors
+            elif isinstance(r, BaseException):
+                errors[adapter.platform] = str(r)
         merged.sort(key=lambda p: p.likes, reverse=True)
-        return merged
+        return merged, errors

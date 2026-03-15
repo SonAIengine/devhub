@@ -2,6 +2,8 @@
 
 from devhub.bluesky import Bluesky
 from devhub.devto import DevTo
+from devhub.discourse import Discourse
+from devhub.github_discussions import GitHubDiscussions
 from devhub.hub import Hub
 from devhub.reddit import Reddit
 from devhub.registry import get_adapter_class, get_adapter_classes, get_configured_adapters
@@ -14,6 +16,8 @@ __all__ = [
     "Bluesky",
     "Twitter",
     "Reddit",
+    "GitHubDiscussions",
+    "Discourse",
     "Post",
     "Comment",
     "UserProfile",

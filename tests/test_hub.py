@@ -2,8 +2,6 @@
 
 from unittest.mock import AsyncMock
 
-import pytest
-
 from devhub.hub import Hub
 from devhub.types import Post, PostResult
 
@@ -28,7 +26,13 @@ class FakeAdapter:
 
     async def search(self, query, *, limit=20):
         return [
-            Post(id="2", platform="fake", title=f"Search: {query}", url="https://fake.com/2", likes=5)
+            Post(
+                id="2",
+                platform="fake",
+                title=f"Search: {query}",
+                url="https://fake.com/2",
+                likes=5,
+            )
         ]
 
     async def write_post(self, title, body, *, tags=None, **kwargs):
@@ -107,3 +111,52 @@ async def test_hub_handles_adapter_error():
     async with hub:
         results = await hub.search("python")
         assert len(results) == 1
+        assert hub.last_errors["search"] == {"fake": "API down"}
+
+
+async def test_hub_tracks_trending_errors_by_platform():
+    healthy = FakeAdapter()
+    healthy.platform = "healthy"
+
+    failing = FakeAdapter()
+    failing.platform = "broken"
+    failing.get_trending = AsyncMock(side_effect=RuntimeError("trending down"))
+
+    hub = Hub(adapters=[healthy, failing])
+    async with hub:
+        results = await hub.get_trending()
+        assert len(results) == 1
+        assert hub.last_errors["get_trending"] == {"broken": "trending down"}
+
+
+async def test_hub_collects_adapter_internal_errors():
+    partial = FakeAdapter()
+    partial.platform = "discourse"
+    partial.last_errors = {"get_trending": {"https://forum.example.com": "timeout"}}
+
+    hub = Hub(adapters=[partial])
+    async with hub:
+        results = await hub.get_trending()
+        assert len(results) == 1
+        assert hub.last_errors["get_trending"] == {
+            "discourse": {"https://forum.example.com": "timeout"}
+        }
+
+
+async def test_hub_publish_preserves_platform_on_error():
+    healthy = FakeAdapter()
+    healthy.platform = "healthy"
+    healthy.write_post = AsyncMock(
+        return_value=PostResult(success=True, platform="healthy", post_id="99")
+    )
+
+    failing = FakeAdapter()
+    failing.platform = "broken"
+    failing.write_post = AsyncMock(side_effect=RuntimeError("write down"))
+
+    hub = Hub(adapters=[healthy, failing])
+    async with hub:
+        results = await hub.publish("Title", "Body")
+        assert [result.platform for result in results] == ["healthy", "broken"]
+        assert results[1].success is False
+        assert hub.last_errors["publish"] == {"broken": "write down"}
