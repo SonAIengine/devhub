@@ -265,10 +265,13 @@ class Twitter(PlatformAdapter):
                 in_reply_to_tweet_id=post_id,
             )
             tweet = resp.data
+            tweet_id = str(tweet["id"]) if tweet else ""
+            url = f"https://x.com/i/status/{tweet_id}" if tweet_id else ""
             return PostResult(
                 success=True,
                 platform=self.platform,
-                post_id=str(tweet["id"]) if tweet else "",
+                post_id=tweet_id,
+                url=url,
             )
         except Exception as exc:
             return PostResult(success=False, platform=self.platform, error=str(exc))
