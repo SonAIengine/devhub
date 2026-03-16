@@ -13,6 +13,27 @@ from devhub.types import Comment, Post, PostResult, UserProfile
 
 _BASE = "https://api.github.com"
 
+_SEARCH_QUERY = """
+query($query: String!, $limit: Int!) {
+  search(query: $query, type: DISCUSSION, first: $limit) {
+    nodes {
+      ... on Discussion {
+        id
+        title
+        body
+        url
+        upvoteCount
+        comments { totalCount }
+        createdAt
+        author { login }
+        repository { nameWithOwner stargazerCount }
+        category { id name isAnswerable }
+      }
+    }
+  }
+}
+"""
+
 
 class GitHubDiscussions(PlatformAdapter):
     """Async adapter for GitHub Discussions via GraphQL."""
@@ -111,33 +132,37 @@ class GitHubDiscussions(PlatformAdapter):
         return posts[:limit]
 
     async def search(self, query: str, *, limit: int = 20) -> list[Post]:
-        filters = " ".join(f"repo:{repo}" for repo in self.repositories)
-        search_query = f"{query} is:public archived:false {filters} type:discussion".strip()
-        data = await self._graphql(
-            """
-            query($query: String!, $limit: Int!) {
-              search(query: $query, type: DISCUSSION, first: $limit) {
-                nodes {
-                  ... on Discussion {
-                    id
-                    title
-                    body
-                    url
-                    upvoteCount
-                    comments { totalCount }
-                    createdAt
-                    author { login }
-                    repository { nameWithOwner }
-                    category { id name isAnswerable }
-                  }
-                }
-              }
-            }
-            """,
-            {"query": search_query, "limit": limit},
+        # 2단계 탐색: 고정 repo 검색 + GitHub 전체 오픈 탐색
+        posts: list[Post] = []
+
+        # 1) 고정 repo 내 검색 (기존 동작)
+        if self.repositories:
+            filters = " ".join(f"repo:{repo}" for repo in self.repositories)
+            pinned_query = f"{query} is:public {filters}".strip()
+            data = await self._graphql(
+                _SEARCH_QUERY,
+                {"query": pinned_query, "limit": min(limit, 10)},
+            )
+            nodes = [n for n in data["search"]["nodes"] if n]
+            posts.extend(self._to_post(n, n["repository"]["nameWithOwner"]) for n in nodes)
+
+        # 2) GitHub 전체 오픈 탐색 (토픽 기반 자유 검색)
+        open_query = f"{query} is:public".strip()
+        data2 = await self._graphql(
+            _SEARCH_QUERY,
+            {"query": open_query, "limit": limit},
         )
-        nodes = [node for node in data["search"]["nodes"] if node]
-        return [self._to_post(node, node["repository"]["nameWithOwner"]) for node in nodes]
+        seen_urls = {p.url for p in posts}
+        for node in data2["search"]["nodes"]:
+            if not node or node.get("url") in seen_urls:
+                continue
+            # stars >= 50인 repo만 (스팸/개인 repo 필터)
+            stars = (node.get("repository") or {}).get("stargazerCount", 0)
+            if stars >= 50:
+                posts.append(self._to_post(node, node["repository"]["nameWithOwner"]))
+                seen_urls.add(node["url"])
+
+        return posts[:limit]
 
     async def get_post(self, post_id: str) -> Post:
         data = await self._graphql(
@@ -356,7 +381,11 @@ class GitHubDiscussions(PlatformAdapter):
             likes=data.get("upvoteCount", 0),
             comments_count=(data.get("comments") or {}).get("totalCount", 0),
             published_at=self._parse_datetime(data.get("createdAt")),
-            raw={"repository": repo, "category": data.get("category", {})},
+            raw={
+                "repository": repo,
+                "category": data.get("category", {}),
+                "stars": (data.get("repository") or {}).get("stargazerCount", 0),
+            },
         )
 
     def _to_comment(

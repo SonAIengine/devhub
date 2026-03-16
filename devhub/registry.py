@@ -21,6 +21,9 @@ _BUILTINS: dict[str, str] = {
     "reddit": "devhub.reddit:Reddit",
     "github_discussions": "devhub.github_discussions:GitHubDiscussions",
     "discourse": "devhub.discourse:Discourse",
+    "mastodon": "devhub.mastodon:Mastodon",
+    "hackernews": "devhub.hackernews:HackerNews",
+    "stackoverflow": "devhub.stackoverflow:StackOverflow",
 }
 
 _cache: dict[str, type[PlatformAdapter]] | None = None
